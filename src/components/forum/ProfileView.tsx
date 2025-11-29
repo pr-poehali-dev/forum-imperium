@@ -6,6 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { getCurrentUser, getNextRank, getRankProgress, RANKS } from '@/lib/auth';
 
 interface Post {
   id: number;
@@ -25,6 +28,20 @@ interface ProfileViewProps {
 }
 
 export default function ProfileView({ posts }: ProfileViewProps) {
+  const user = getCurrentUser();
+  const nextRank = user ? getNextRank(user.rating) : null;
+  const progress = user ? getRankProgress(user.rating) : 0;
+
+  if (!user) {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-20">
+        <Icon name="UserX" size={64} className="mx-auto mb-4 text-muted-foreground" />
+        <h2 className="text-2xl font-bold mb-2">Войдите для просмотра профиля</h2>
+        <p className="text-muted-foreground">Создайте аккаунт или войдите, чтобы увидеть статистику</p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <Card className="border-2">
@@ -33,12 +50,15 @@ export default function ProfileView({ posts }: ProfileViewProps) {
           <div className="relative flex items-end gap-6">
             <Avatar className="w-32 h-32 border-4 border-card">
               <AvatarFallback className="gradient-blue-purple text-white text-4xl">
-                U
+                {user.username[0].toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div className="pb-4">
-              <h2 className="text-3xl font-bold">CurrentUser</h2>
-              <p className="text-muted-foreground">Участник с января 2024</p>
+            <div className="pb-4 flex-1">
+              <div className="flex items-center gap-3">
+                <h2 className="text-3xl font-bold">{user.username}</h2>
+                <Badge className="gradient-purple">{user.rank}</Badge>
+              </div>
+              <p className="text-muted-foreground">Участник с {new Date(user.joinDate).toLocaleDateString('ru-RU')}</p>
             </div>
           </div>
         </CardHeader>
@@ -50,26 +70,81 @@ export default function ProfileView({ posts }: ProfileViewProps) {
               <TabsTrigger value="settings">Настройки</TabsTrigger>
             </TabsList>
             <TabsContent value="stats" className="space-y-6 mt-6">
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle>Прогресс ранга</CardTitle>
+                  <CardDescription>
+                    {nextRank ? 
+                      `До следующего ранга "${nextRank.name}" осталось ${nextRank.minRating - user.rating} рейтинга` :
+                      'Вы достигли максимального ранга!'
+                    }
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Progress value={progress} className="h-3" />
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-center">
+                      <div className="text-3xl mb-1">{RANKS.find(r => r.name === user.rank)?.icon}</div>
+                      <div className="text-sm font-semibold">{user.rank}</div>
+                    </div>
+                    {nextRank && (
+                      <>
+                        <Icon name="ArrowRight" size={24} className="text-muted-foreground" />
+                        <div className="text-center">
+                          <div className="text-3xl mb-1">{nextRank.icon}</div>
+                          <div className="text-sm font-semibold">{nextRank.name}</div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="grid md:grid-cols-3 gap-4">
                 <Card>
                   <CardContent className="pt-6 text-center">
-                    <div className="text-4xl font-bold gradient-text">1,234</div>
+                    <div className="text-4xl font-bold gradient-text">{user.rating}</div>
                     <div className="text-muted-foreground mt-2">Рейтинг</div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-6 text-center">
-                    <div className="text-4xl font-bold gradient-text">87</div>
+                    <div className="text-4xl font-bold gradient-text">{user.posts}</div>
                     <div className="text-muted-foreground mt-2">Постов</div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-6 text-center">
-                    <div className="text-4xl font-bold gradient-text">456</div>
+                    <div className="text-4xl font-bold gradient-text">{user.comments}</div>
                     <div className="text-muted-foreground mt-2">Комментариев</div>
                   </CardContent>
                 </Card>
               </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Все ранги форума</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {RANKS.map((rank) => (
+                      <div 
+                        key={rank.name}
+                        className={`flex items-center gap-4 p-3 rounded-lg ${rank.name === user.rank ? 'bg-primary/10 border-2 border-primary' : 'bg-muted'}`}
+                      >
+                        <div className="text-3xl">{rank.icon}</div>
+                        <div className="flex-1">
+                          <div className="font-semibold">{rank.name}</div>
+                          <div className="text-sm text-muted-foreground">От {rank.minRating} рейтинга</div>
+                        </div>
+                        {rank.name === user.rank && (
+                          <Badge className="gradient-purple">Текущий ранг</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
               <Card>
                 <CardHeader>
@@ -127,15 +202,15 @@ export default function ProfileView({ posts }: ProfileViewProps) {
                 <CardContent className="space-y-4">
                   <div>
                     <Label>Имя пользователя</Label>
-                    <Input placeholder="CurrentUser" className="mt-2" />
+                    <Input placeholder={user.username} className="mt-2" disabled />
                   </div>
                   <div>
                     <Label>Email</Label>
-                    <Input type="email" placeholder="user@example.com" className="mt-2" />
+                    <Input type="email" placeholder={user.email} className="mt-2" disabled />
                   </div>
                   <div>
                     <Label>О себе</Label>
-                    <Textarea placeholder="Расскажите о себе..." className="mt-2" />
+                    <Textarea placeholder={user.bio || "Расскажите о себе..."} className="mt-2" />
                   </div>
                   <Button className="w-full gradient-purple hover-glow">
                     Сохранить изменения
